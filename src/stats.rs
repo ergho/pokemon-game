@@ -35,13 +35,26 @@ pub struct BaseStats {
 
 impl BaseStats {
     pub fn new(attack: Stat, defense: Stat, max_hp: Stat, speed: Stat) -> Self {
-        Self { attack, defense, max_hp, speed }
+        Self {
+            attack,
+            defense,
+            max_hp,
+            speed,
+        }
     }
 
-    pub fn attack(&self) -> u16 { self.attack.get() }
-    pub fn defense(&self) -> u16 { self.defense.get() }
-    pub fn max_hp(&self) -> u16 { self.max_hp.get() }
-    pub fn speed(&self) -> u16 { self.speed.get() }
+    pub fn attack(&self) -> u16 {
+        self.attack.get()
+    }
+    pub fn defense(&self) -> u16 {
+        self.defense.get()
+    }
+    pub fn max_hp(&self) -> u16 {
+        self.max_hp.get()
+    }
+    pub fn speed(&self) -> u16 {
+        self.speed.get()
+    }
 }
 
 /// Individual stats for a creature (currently just a copy of base stats)
@@ -82,7 +95,7 @@ mod tests {
             Stat::new(10).unwrap(),
             Stat::new(8).unwrap(),
             Stat::new(30).unwrap(),
-            Stat::new(12).unwrap()
+            Stat::new(12).unwrap(),
         );
         assert_eq!(bs.attack(), 10);
         assert_eq!(bs.defense(), 8);
@@ -96,7 +109,7 @@ mod tests {
             Stat::new(10).unwrap(),
             Stat::new(8).unwrap(),
             Stat::new(30).unwrap(),
-            Stat::new(12).unwrap()
+            Stat::new(12).unwrap(),
         );
         let ind = IndividualStats::from_base(&bs);
         assert_eq!(ind.attack.get(), 10);
@@ -105,4 +118,3 @@ mod tests {
         assert_eq!(ind.speed.get(), 12);
     }
 }
-

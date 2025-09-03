@@ -1,62 +1,50 @@
 use crate::creature::Creature;
 
-/// Maximum party size
-pub const MAX_PARTY_SIZE: usize = 6;
-
-/// Represents a group of creatures belonging to a player, NPC, or AI
+/// Represents a party of creatures (like Pokémon party)
 pub struct Party {
-    pub creatures: [Option<Creature>; MAX_PARTY_SIZE],
+    pub creatures: [Creature; 6], // Fixed size for simplicity
 }
 
 impl Party {
-    /// Create a new party from a vector of creatures
-    pub fn new(creatures: Vec<Creature>) -> Self {
-        let mut arr: [Option<Creature>; MAX_PARTY_SIZE] = Default::default();
-        for (i, creature) in creatures.into_iter().take(MAX_PARTY_SIZE).enumerate() {
-            arr[i] = Some(creature);
-        }
-        Self { creatures: arr }
+    /// Create a new party from a fixed array of creatures
+    pub fn new(creatures: [Creature; 6]) -> Self {
+        Self { creatures }
     }
 
-    /// Returns a reference to the first non-fainted creature, if any
+    /// Returns a reference to the first available (non-fainted) creature
     pub fn active(&self) -> Option<&Creature> {
-        self.creatures.iter().find_map(|c| match c {
-            Some(creature) if !creature.is_fainted() => Some(creature),
-            _ => None,
-        })
+        self.creatures.iter().find(|c| !c.is_fainted())
     }
 
-    /// Returns a mutable reference to the first non-fainted creature, if any
+    /// Returns a mutable reference to the first available creature
     pub fn active_mut(&mut self) -> Option<&mut Creature> {
-        self.creatures.iter_mut().find_map(|c| match c {
-            Some(creature) if !creature.is_fainted() => Some(creature),
-            _ => None,
-        })
+        self.creatures.iter_mut().find(|c| !c.is_fainted())
     }
 
-    /// Get creature at a specific index
-    pub fn get(&self, index: usize) -> Option<&Creature> {
-        self.creatures.get(index).and_then(|c| c.as_ref())
-    }
-
-    /// Get mutable creature at a specific index
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Creature> {
-        self.creatures.get_mut(index).and_then(|c| c.as_mut())
-    }
-
-    /// Swap two creatures in the party
-    pub fn swap(&mut self, i: usize, j: usize) {
-        if i < self.creatures.len() && j < self.creatures.len() {
-            self.creatures.swap(i, j);
-        }
-    }
-
-    /// Check if all creatures have fainted
+    /// Checks if all creatures in the party are fainted
     pub fn all_fainted(&self) -> bool {
-        self.creatures.iter().all(|c| match c {
-            Some(creature) => creature.is_fainted(),
-            None => true,
-        })
+        self.creatures.iter().all(|c| c.is_fainted())
+    }
+
+    /// Returns a slice of all creatures in the party
+    pub fn all(&self) -> &[Creature] {
+        &self.creatures
+    }
+
+    /// Returns a mutable slice of all creatures
+    pub fn all_mut(&mut self) -> &mut [Creature] {
+        &mut self.creatures
+    }
+
+    /// Swaps the creatures at two indices
+    ///
+    /// Returns `true` if the swap succeeded, `false` if indices are out of bounds
+    pub fn swap(&mut self, idx_a: usize, idx_b: usize) -> bool {
+        if idx_a >= self.creatures.len() || idx_b >= self.creatures.len() {
+            return false;
+        }
+        self.creatures.swap(idx_a, idx_b);
+        true
     }
 }
 
@@ -64,45 +52,101 @@ impl Party {
 mod tests {
     use super::*;
     use crate::creature::{Creature, CreatureId};
-    use crate::stats::{IndividualStats, Stat};
-    use crate::species::SpeciesId;
+    use crate::species::{Species, SpeciesId, SpeciesName};
+    use crate::stats::{BaseStats, IndividualStats, Stat};
 
-    fn create_creature(speed: u16) -> Creature {
-        Creature::new(
-            CreatureId::new(),
-            SpeciesId(1),
-            None,
-            5,
-            IndividualStats {
-                attack: Stat::new(10).unwrap(),
-                defense: Stat::new(8).unwrap(),
-                max_hp: Stat::new(30).unwrap(),
-                speed: Stat::new(speed).unwrap(),
-            },
-        )
+    /// Helper to create a simple test creature with a specific HP
+    fn make_test_creature(hp: u16) -> Creature {
+        let id = CreatureId::new(); // Unique ID for each creature
+        // Construct BaseStats using the Stat newtype
+        let base_stats = BaseStats {
+            attack: Stat::new(10).unwrap(),
+            defense: Stat::new(10).unwrap(),
+            max_hp: Stat::new(hp).unwrap(),
+            speed: Stat::new(10).unwrap(),
+        };
+
+        // Create Species using the base stats
+        let species = Species::new(SpeciesId(1), SpeciesName::new("TestSpecies"), base_stats);
+
+        // Generate individual stats from species.base_stats
+        let individual_stats = IndividualStats::from_base(&species.base_stats);
+
+        // Construct the creature
+        Creature::new(id, species.id, None, 1, individual_stats)
     }
 
     #[test]
-    fn active_skips_fainted() {
-        let mut party = Party::new(vec![create_creature(10), create_creature(20)]);
-        party.active_mut().unwrap().modify_hp(-100); // faint first creature
+    fn active_returns_first_non_fainted() {
+        let mut creatures = [
+            make_test_creature(10),
+            make_test_creature(15),
+            make_test_creature(17),
+            make_test_creature(11),
+            make_test_creature(19),
+            make_test_creature(100),
+        ];
+        let party = Party::new(creatures);
+
         let active = party.active().unwrap();
-        assert_eq!(active.speed.get(), 20);
+        assert_eq!(active.current_hp, 10);
     }
 
     #[test]
-    fn all_fainted_detected() {
-        let mut party = Party::new(vec![create_creature(10), create_creature(20)]);
-        party.get_mut(0).unwrap().modify_hp(-100);
-        party.get_mut(1).unwrap().modify_hp(-100);
-        assert!(party.all_fainted());
+    fn all_fainted_detects_fainted_party() {
+        let mut creatures = [
+            make_test_creature(10),
+            make_test_creature(10),
+            make_test_creature(10),
+            make_test_creature(10),
+            make_test_creature(10),
+            make_test_creature(10),
+        ];
+        // Simulate all creatures fainted
+        for c in creatures.iter_mut() {
+            c.current_hp = 0;
+        }
+
+        let party = Party::new(creatures);
+
+        assert!(party.all_fainted())
     }
 
     #[test]
-    fn swap_creatures() {
-        let mut party = Party::new(vec![create_creature(10), create_creature(20)]);
-        party.swap(0, 1);
-        let active = party.active().unwrap();
-        assert_eq!(active.speed.get(), 20);
+    fn swap_swaps_creatures_correctly() {
+        let creatures = [
+            make_test_creature(10),
+            make_test_creature(20),
+            make_test_creature(30),
+            make_test_creature(40),
+            make_test_creature(50),
+            make_test_creature(60),
+        ];
+        let mut party = Party::new(creatures);
+
+        let first_before = party.creatures[0].current_hp;
+        let third_before = party.creatures[2].current_hp;
+
+        let swapped = party.swap(0, 2);
+        assert!(swapped);
+
+        assert_eq!(party.creatures[0].current_hp, third_before);
+        assert_eq!(party.creatures[2].current_hp, first_before);
+    }
+
+    #[test]
+    fn swap_returns_false_for_out_of_bounds() {
+        let creatures = [
+            make_test_creature(10),
+            make_test_creature(20),
+            make_test_creature(30),
+            make_test_creature(40),
+            make_test_creature(50),
+            make_test_creature(60),
+        ];
+        let mut party = Party::new(creatures);
+
+        let swapped = party.swap(0, 6); // index 6 is out of bounds
+        assert!(!swapped);
     }
 }
