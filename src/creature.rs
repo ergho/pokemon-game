@@ -6,6 +6,12 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CreatureId(Uuid);
 
+impl Default for CreatureId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CreatureId {
     pub fn new() -> Self {
         CreatureId(Uuid::new_v4())
@@ -92,7 +98,7 @@ mod tests {
 
         assert_eq!(c.current_hp, 30);
         assert_eq!(c.level, 5);
-        assert_eq!(c.name().contains("Leafy"), true);
+        assert!(c.name().contains("Leafy"));
         assert_eq!(c.individual_stats.attack.get(), 10);
     }
 

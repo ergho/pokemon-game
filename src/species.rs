@@ -1,3 +1,4 @@
+use crate::experience::GrowthRate;
 use crate::stats::BaseStats;
 use std::fmt;
 
@@ -31,14 +32,21 @@ pub struct Species {
     pub id: SpeciesId,
     pub name: SpeciesName,
     pub base_stats: BaseStats,
+    pub growth_rate: GrowthRate,
 }
 
 impl Species {
-    pub fn new(id: SpeciesId, name: SpeciesName, base_stats: BaseStats) -> Self {
+    pub fn new(
+        id: SpeciesId,
+        name: SpeciesName,
+        base_stats: BaseStats,
+        growth_rate: GrowthRate,
+    ) -> Self {
         Self {
             id,
             name,
             base_stats,
+            growth_rate,
         }
     }
 }
@@ -46,20 +54,20 @@ impl Species {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stats::Stat;
 
     #[test]
     fn species_creation() {
-        let stats = BaseStats::new(
-            Stat::new(10).unwrap(),
-            Stat::new(12).unwrap(),
-            Stat::new(35).unwrap(),
-            Stat::new(8).unwrap(),
+        let stats = BaseStats::new(10, 12, 35, 8).unwrap();
+        let species = Species::new(
+            SpeciesId(1),
+            SpeciesName::new("Bulby"),
+            stats,
+            GrowthRate::Fast,
         );
-        let species = Species::new(SpeciesId(1), SpeciesName::new("Bulby"), stats);
 
         assert_eq!(species.id.0, 1);
         assert_eq!(species.name.as_str(), "Bulby");
         assert_eq!(species.base_stats.max_hp(), 35);
+        assert_eq!(species.growth_rate, GrowthRate::Fast);
     }
 }

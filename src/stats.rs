@@ -4,12 +4,20 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stat(u16);
 
+#[derive(Debug)]
+pub enum StatError {
+    OutOfRange { value: u16 },
+}
+
 impl Stat {
-    pub fn new(value: u16) -> Result<Self, String> {
-        if value == 0 {
-            Err("Stat must be greater than 0".into())
+    const MIN: u16 = 1;
+    const MAX: u16 = 10000;
+
+    pub fn new(value: u16) -> Result<Self, StatError> {
+        if { Self::MIN..=Self::MAX }.contains(&value) {
+            Ok(Stat(value))
         } else {
-            Ok(Self(value))
+            Err(StatError::OutOfRange { value })
         }
     }
 
@@ -34,13 +42,13 @@ pub struct BaseStats {
 }
 
 impl BaseStats {
-    pub fn new(attack: Stat, defense: Stat, max_hp: Stat, speed: Stat) -> Self {
-        Self {
-            attack,
-            defense,
-            max_hp,
-            speed,
-        }
+    pub fn new(attack: u16, defense: u16, max_hp: u16, speed: u16) -> Result<Self, StatError> {
+        Ok(Self {
+            attack: Stat::new(attack)?,
+            defense: Stat::new(defense)?,
+            max_hp: Stat::new(max_hp)?,
+            speed: Stat::new(speed)?,
+        })
     }
 
     pub fn attack(&self) -> u16 {
@@ -70,10 +78,10 @@ impl IndividualStats {
     /// Create individual stats from base stats (future: apply level/IV formulas)
     pub fn from_base(base: &BaseStats) -> Self {
         Self {
-            attack: Stat::new(base.attack()).unwrap(),
-            defense: Stat::new(base.defense()).unwrap(),
-            max_hp: Stat::new(base.max_hp()).unwrap(),
-            speed: Stat::new(base.speed()).unwrap(),
+            attack: base.attack,
+            defense: base.defense,
+            max_hp: base.max_hp,
+            speed: base.speed,
         }
     }
 }
@@ -91,12 +99,7 @@ mod tests {
 
     #[test]
     fn basestats_creation() {
-        let bs = BaseStats::new(
-            Stat::new(10).unwrap(),
-            Stat::new(8).unwrap(),
-            Stat::new(30).unwrap(),
-            Stat::new(12).unwrap(),
-        );
+        let bs = BaseStats::new(10, 8, 30, 12).unwrap();
         assert_eq!(bs.attack(), 10);
         assert_eq!(bs.defense(), 8);
         assert_eq!(bs.max_hp(), 30);
@@ -105,12 +108,7 @@ mod tests {
 
     #[test]
     fn individualstats_creation() {
-        let bs = BaseStats::new(
-            Stat::new(10).unwrap(),
-            Stat::new(8).unwrap(),
-            Stat::new(30).unwrap(),
-            Stat::new(12).unwrap(),
-        );
+        let bs = BaseStats::new(10, 8, 30, 12).unwrap();
         let ind = IndividualStats::from_base(&bs);
         assert_eq!(ind.attack.get(), 10);
         assert_eq!(ind.defense.get(), 8);

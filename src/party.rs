@@ -67,7 +67,12 @@ mod tests {
         };
 
         // Create Species using the base stats
-        let species = Species::new(SpeciesId(1), SpeciesName::new("TestSpecies"), base_stats);
+        let species = Species::new(
+            SpeciesId(1),
+            SpeciesName::new("TestSpecies"),
+            base_stats,
+            crate::experience::GrowthRate::Fast,
+        );
 
         // Generate individual stats from species.base_stats
         let individual_stats = IndividualStats::from_base(&species.base_stats);
@@ -78,7 +83,7 @@ mod tests {
 
     #[test]
     fn active_returns_first_non_fainted() {
-        let mut creatures = [
+        let creatures = [
             make_test_creature(10),
             make_test_creature(15),
             make_test_creature(17),
