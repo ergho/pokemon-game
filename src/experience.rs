@@ -4,19 +4,28 @@ pub const MAX_LEVEL: u8 = 100;
 pub struct Level(u8);
 
 impl Level {
+    pub const MIN: u8 = 1;
+    pub const MAX: u8 = 100;
+
     pub fn new(value: u8) -> Option<Self> {
-        if (1..=MAX_LEVEL).contains(&value) {
-            Some(Level(value))
-        } else {
-            None
-        }
+        (Self::MIN..=Self::MAX)
+            .contains(&value)
+            .then_some(Self(value))
+    }
+
+    pub fn get(self) -> u8 {
+        self.0
+    }
+
+    pub fn is_max(self) -> bool {
+        self.0 == Self::MAX
     }
 
     pub fn next(self) -> Option<Self> {
-        if self.0 < MAX_LEVEL {
-            Some(Level(self.0 + 1))
-        } else {
+        if self.is_max() {
             None
+        } else {
+            Self::new(self.0 + 1)
         }
     }
 }
@@ -33,7 +42,7 @@ pub enum GrowthRate {
 
 impl GrowthRate {
     pub fn exp_for_level(self, level: Level) -> u32 {
-        let l = level.0 as u32;
+        let l = level.get() as u32;
         match self {
             GrowthRate::Fast => (4 * l.pow(3)) / 5,
             GrowthRate::MediumFast => l.pow(3),
@@ -67,25 +76,17 @@ impl GrowthRate {
     }
 
     pub fn level_from_exp(self, exp: u32) -> Level {
-        //test binary search
-        let mut low = 1;
-        let mut high = MAX_LEVEL;
+        let mut low = Level::MIN;
+        let mut high = Level::MAX;
         while low < high {
-            //let mid = (low + high + 1) / 2;
             let mid = (low + high).div_ceil(2);
-            if exp >= self.exp_for_level(Level::new(mid).unwrap()) {
+            if exp >= self.exp_for_level(Level::new(mid).expect("Mid always valid")) {
                 low = mid;
             } else {
                 high = mid - 1;
             }
         }
-        Level::new(low).unwrap()
-        //for lvl in (1..=MAX_LEVEL).rev() {
-        //    if exp >= self.exp_for_level(Level(lvl)) {
-        //        return Level::new(lvl.max(1)).unwrap();
-        //    }
-        //}
-        //Level(1)
+        Level::new(low).expect("Level always valid")
     }
 }
 
@@ -167,6 +168,7 @@ mod tests {
             );
         }
     }
+
     #[test]
     fn level_from_exp_matches_known_values() {
         for exp in EXPECTATIONS {
@@ -175,5 +177,29 @@ mod tests {
             assert_eq!(exp.rate.level_from_exp(exp.level_50), level(50));
             assert_eq!(exp.rate.level_from_exp(exp.level_100), level(100));
         }
+    }
+
+    #[test]
+    fn level_from_xp_between_levels() {
+        let rate = GrowthRate::Fast;
+
+        let xp = rate.exp_for_level(level(10)) + 1;
+        assert_eq!(rate.level_from_exp(xp), level(10));
+    }
+
+    #[test]
+    fn xp_to_next_level_behavior() {
+        let rate = GrowthRate::MediumFast;
+
+        let xp = rate.exp_for_level(level(10));
+        let needed = rate.exp_to_next_level(level(10));
+
+        assert_eq!(needed, Some(rate.exp_for_level(level(11)) - xp));
+    }
+
+    #[test]
+    fn cannot_level_past_max() {
+        let rate = GrowthRate::Slow;
+        assert_eq!(rate.exp_to_next_level(level(100)), None);
     }
 }
