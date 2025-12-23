@@ -67,12 +67,25 @@ impl GrowthRate {
     }
 
     pub fn level_from_exp(self, exp: u32) -> Level {
-        for lvl in (1..=MAX_LEVEL).rev() {
-            if exp >= self.exp_for_level(Level(lvl)) {
-                return Level::new(lvl.max(1)).unwrap();
+        //test binary search
+        let mut low = 1;
+        let mut high = MAX_LEVEL;
+        while low < high {
+            //let mid = (low + high + 1) / 2;
+            let mid = (low + high).div_ceil(2);
+            if exp >= self.exp_for_level(Level::new(mid).unwrap()) {
+                low = mid;
+            } else {
+                high = mid - 1;
             }
         }
-        Level(1)
+        Level::new(low).unwrap()
+        //for lvl in (1..=MAX_LEVEL).rev() {
+        //    if exp >= self.exp_for_level(Level(lvl)) {
+        //        return Level::new(lvl.max(1)).unwrap();
+        //    }
+        //}
+        //Level(1)
     }
 }
 
