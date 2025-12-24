@@ -11,7 +11,7 @@ impl Move {
         CreatureType::combined_multiplier(self.move_type, defender_types)
     }
 
-    pub fn compute_damage(
+    pub fn effective_power(
         &self,
         user_types: &[CreatureType],
         defender_types: &[CreatureType],
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_damage_without_stab() {
+    fn test_effective_power_without_stab() {
         let flamethrower = Move {
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
@@ -60,13 +60,13 @@ mod tests {
         };
 
         // User type does not match move type (no STAB)
-        let damage = flamethrower.compute_damage(&[CreatureType::Water], &[Grass]);
+        let damage = flamethrower.effective_power(&[CreatureType::Water], &[Grass]);
         // Effectiveness multiplier = 2.0, no STAB
         assert_eq!(damage, 180.0);
     }
 
     #[test]
-    fn test_compute_damage_with_stab() {
+    fn test_effective_power_with_stab() {
         let flamethrower = Move {
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
@@ -74,13 +74,13 @@ mod tests {
         };
 
         // User type matches move type (STAB applies)
-        let damage = flamethrower.compute_damage(&[CreatureType::Fire], &[Grass]);
+        let damage = flamethrower.effective_power(&[CreatureType::Fire], &[Grass]);
         // Effectiveness multiplier = 2.0, STAB = 1.5 -> total = 270
         assert_eq!(damage, 270.0);
     }
 
     #[test]
-    fn test_compute_damage_multiple_defenders_with_stab() {
+    fn test_effective_power_multiple_defenders_with_stab() {
         let flamethrower = Move {
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
@@ -88,7 +88,7 @@ mod tests {
         };
 
         let defenders = [Grass, Water]; // Fire vs Grass = 2, Fire vs Water = 0.5 -> 1.0
-        let damage = flamethrower.compute_damage(&[CreatureType::Fire], &defenders);
+        let damage = flamethrower.effective_power(&[CreatureType::Fire], &defenders);
         // STAB = 1.5 -> total = 1.0 * 90 * 1.5 = 135
         assert_eq!(damage, 135.0);
     }
