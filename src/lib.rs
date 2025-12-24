@@ -5,6 +5,7 @@ pub mod encounter;
 pub mod event;
 pub mod event_queue;
 pub mod experience;
+pub mod moves;
 pub mod party;
 pub mod species;
 pub mod species_registry;
