@@ -1,5 +1,6 @@
 pub mod battle;
 pub mod creature;
+pub mod creature_type;
 pub mod encounter;
 pub mod event;
 pub mod event_queue;
