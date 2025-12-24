@@ -1,6 +1,4 @@
-pub const MAX_LEVEL: u8 = 100;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub struct Level(u8);
 
 impl Level {

@@ -51,34 +51,20 @@ impl Party {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::{Creature, CreatureId};
-    use crate::species::{Species, SpeciesId, SpeciesName};
-    use crate::stats::{BaseStats, IndividualStats, Stat};
+    use crate::creature::Creature;
+    use crate::species::SpeciesId;
+    use crate::species_registry::SpeciesRegistry;
+    use crate::stats::Stat;
+    use crate::tests::helpers::MockRegistry;
 
     /// Helper to create a simple test creature with a specific HP
     fn make_test_creature(hp: u16) -> Creature {
-        let id = CreatureId::new(); // Unique ID for each creature
-        // Construct BaseStats using the Stat newtype
-        let base_stats = BaseStats {
-            attack: Stat::new(10).unwrap(),
-            defense: Stat::new(10).unwrap(),
-            max_hp: Stat::new(hp).unwrap(),
-            speed: Stat::new(10).unwrap(),
-        };
-
-        // Create Species using the base stats
-        let species = Species::new(
-            SpeciesId(1),
-            SpeciesName::new("TestSpecies"),
-            base_stats,
-            crate::experience::GrowthRate::Fast,
-        );
-
-        // Generate individual stats from species.base_stats
-        let individual_stats = IndividualStats::from_base(&species.base_stats);
-
-        // Construct the creature
-        Creature::new(id, species.id, None, 1, individual_stats)
+        let registry = MockRegistry::new();
+        let species = registry.get_species(SpeciesId(1)).unwrap();
+        let mut c = Creature::new(species, 5).unwrap();
+        c.individual_stats.max_hp = Stat::new(hp).unwrap();
+        c.current_hp = hp;
+        c
     }
 
     #[test]

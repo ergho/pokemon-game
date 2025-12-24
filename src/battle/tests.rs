@@ -3,20 +3,14 @@ use crate::battle::*;
 use crate::creature::Creature;
 use crate::party::Party;
 use crate::species::SpeciesId;
-use crate::stats::{BaseStats, IndividualStats};
+use crate::species_registry::SpeciesRegistry;
+use crate::tests::helpers::MockRegistry;
 
 /// Helper to create a simple test creature
 fn make_test_creature() -> Creature {
-    let basestats = BaseStats::new(10, 10, 30, 10).unwrap();
-
-    let individualstats = IndividualStats::from_base(&basestats);
-    Creature::new(
-        CreatureId::default(),
-        SpeciesId(1),
-        None,
-        1,
-        individualstats,
-    )
+    let registry = MockRegistry::new();
+    let species = registry.get_species(SpeciesId(1)).unwrap();
+    Creature::new(species, 5).unwrap()
 }
 
 /// Sets up a battle with two parties of 6 creatures each
