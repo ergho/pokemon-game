@@ -1,9 +1,25 @@
 use crate::creature_type::CreatureType;
 
+pub trait MoveRegistry {
+    fn get(&self, id: &MoveId) -> Option<&Move>;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoveId(pub u16);
+
+impl MoveId {
+    pub fn new(id: u16) -> Self {
+        MoveId(id)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Move {
+    pub id: MoveId,
     pub name: String,
     pub move_type: CreatureType,
     pub power: u8,
+    pub max_pp: u8,
 }
 
 impl Move {
@@ -32,9 +48,11 @@ mod tests {
     #[test]
     fn test_effectiveness_multiplier() {
         let flamethrower = Move {
+            id: MoveId(1),
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
             power: 90,
+            max_pp: 15,
         };
 
         // Single defender type
@@ -54,9 +72,11 @@ mod tests {
     #[test]
     fn test_effective_power_without_stab() {
         let flamethrower = Move {
+            id: MoveId(1),
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
             power: 90,
+            max_pp: 15,
         };
 
         // User type does not match move type (no STAB)
@@ -68,8 +88,10 @@ mod tests {
     #[test]
     fn test_effective_power_with_stab() {
         let flamethrower = Move {
+            id: MoveId(1),
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
+            max_pp: 15,
             power: 90,
         };
 
@@ -82,9 +104,11 @@ mod tests {
     #[test]
     fn test_effective_power_multiple_defenders_with_stab() {
         let flamethrower = Move {
+            id: MoveId(1),
             name: "Flamethrower".to_string(),
             move_type: CreatureType::Fire,
             power: 90,
+            max_pp: 15,
         };
 
         let defenders = [Grass, Water]; // Fire vs Grass = 2, Fire vs Water = 0.5 -> 1.0

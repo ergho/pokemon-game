@@ -1,7 +1,8 @@
-use crate::experience::{GrowthRate, Level};
+use crate::experience::Level;
+use crate::moves::MoveId;
 use crate::species::{Species, SpeciesId};
 use crate::species_registry::SpeciesRegistry;
-use crate::stats::IndividualStats;
+use crate::stats::{BaseStats, IndividualStats};
 use uuid::Uuid;
 
 /// Globally unique identifier for each persistent creature
@@ -38,6 +39,7 @@ pub struct Creature {
     pub experience: u32,
     pub individual_stats: IndividualStats,
     pub current_hp: u16, // Plain u16, allows 0 for fainted state
+    pub moves: MoveSlots,
 }
 
 impl Creature {
@@ -58,6 +60,7 @@ impl Creature {
             experience,
             individual_stats,
             current_hp,
+            moves: [None, None, None, None],
         })
     }
 
@@ -75,36 +78,133 @@ impl Creature {
         self.current_hp == 0
     }
 
-    pub fn gain_exp<R: SpeciesRegistry>(&mut self, amount: u32, registry: &R) {
+    pub fn gain_exp<S: SpeciesRegistry>(
+        &mut self,
+        amount: u32,
+        species_registry: &S,
+    ) -> Vec<LevelUpEvent> {
+        let mut events = Vec::new();
         self.experience += amount;
 
-        let growth_rate = match registry.get_growth_rate(self.species_id) {
+        let growth_rate = match species_registry.get_growth_rate(self.species_id) {
             Some(gr) => gr,
             None => panic!("things are broken with your registry"), // things are wonky if this happens
         };
         while let Some(next_level) = self.level.next() {
             let next_level_exp = growth_rate.exp_for_level(next_level);
             if self.experience >= next_level_exp {
-                self.level_up(next_level, registry);
+                let mut level_events = self.level_up(next_level, species_registry);
+                events.append(&mut level_events);
             } else {
                 break;
             }
         }
+        events
     }
 
-    fn level_up<R: SpeciesRegistry>(&mut self, next_level: Level, _registry: &R) {
-        self.on_level_up(next_level);
+    fn level_up<S: SpeciesRegistry>(
+        &mut self,
+        next_level: Level,
+        species_registry: &S,
+    ) -> Vec<LevelUpEvent> {
+        let events = self.on_level_up(next_level, species_registry);
         self.level = next_level;
+        events
     }
 
-    fn on_level_up(&self, _level: Level) {}
+    fn on_level_up<S: SpeciesRegistry>(
+        &mut self,
+        level: Level,
+        species_registry: &S,
+    ) -> Vec<LevelUpEvent> {
+        let mut events = Vec::new();
+        let species = match species_registry.get_species(self.species_id) {
+            Some(s) => s,
+            None => panic!(),
+        };
+
+        //self.recalculate_stats(level, species.base_stats);
+
+        for m in species.learnset.iter().filter(|m| m.level == level) {
+            events.push(LevelUpEvent::CanLearnMove {
+                move_id: m.move_id.clone(),
+            });
+        }
+
+        //if let Some(new_species_id) = species.check_evolution(level) {
+        //    events.push(LevelUpEvent::CanEvolve { species_id: new_species_id })
+        //}
+
+        events
+    }
+
+    //fn recalculate_stats(&mut self, base_stats: BaseStats) {
+
+    //}
+
+    pub fn try_learn_move(&mut self, move_id: MoveId, max_pp: u8) -> LearnMoveResult {
+        if self
+            .moves
+            .iter()
+            .any(|m| m.as_ref().is_some_and(|m| m.move_id == move_id))
+        {
+            return LearnMoveResult::AlreadyKnown;
+        }
+        if let Some((_index, slot)) = self
+            .moves
+            .iter_mut()
+            .enumerate()
+            .find(|(_, slot)| slot.is_none())
+        {
+            *slot = Some(CreatureMove {
+                move_id,
+                pp: MovePP {
+                    current: max_pp,
+                    max: max_pp,
+                },
+            });
+            return LearnMoveResult::Learned;
+        }
+        LearnMoveResult::MustForgetOldMove
+    }
+
+    pub fn forget_move(&mut self, slot: usize) -> Option<CreatureMove> {
+        self.moves.get_mut(slot)?.take()
+    }
 }
+
+#[derive(Debug, Clone)]
+pub enum LevelUpEvent {
+    CanEvolve { species_id: SpeciesId },
+    CanLearnMove { move_id: MoveId },
+}
+#[derive(Debug, Clone)]
+pub enum LearnMoveResult {
+    AlreadyKnown,
+    Learned,
+    MustForgetOldMove,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MovePP {
+    pub current: u8,
+    pub max: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreatureMove {
+    pub move_id: MoveId,
+    pub pp: MovePP,
+}
+
+pub type MoveSlots = [Option<CreatureMove>; 4];
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::experience::GrowthRate;
     use crate::species::SpeciesId;
-    use crate::tests::helpers::MockRegistry;
+    use crate::tests::helpers::{MockMoveRegistry, MockRegistry};
 
     fn test_creature(level: u8, registry: &MockRegistry) -> Creature {
         Creature::new(registry.get_species(SpeciesId(1)).unwrap(), level).unwrap()
@@ -184,5 +284,59 @@ mod tests {
         c.modify_hp(-100);
         assert_eq!(c.current_hp, 0);
         assert!(c.is_fainted());
+    }
+
+    #[test]
+    fn level_up_triggers_learn_move_event() {
+        let species_registry = MockRegistry::new(); // learnset in mock: lvl 5, 10, 15
+
+        let mut creature =
+            Creature::new(species_registry.get_species(SpeciesId(1)).unwrap(), 4).unwrap();
+
+        let events = creature.level_up(Level::new(5).unwrap(), &species_registry);
+
+        assert_eq!(events.len(), 1);
+
+        match &events[0] {
+            LevelUpEvent::CanLearnMove { move_id } => {
+                assert_eq!(*move_id, MoveId(1)); // corresponds to the first move in MockMoveRegistry
+            }
+            _ => panic!("Expected CanLearnMove event at level 5"),
+        }
+    }
+
+    #[test]
+    fn gain_exp_triggers_multiple_learn_move_events() {
+        let species_registry = MockRegistry::new(); // learnset: lvl 5, 10, 15
+
+        let mut creature =
+            Creature::new(species_registry.get_species(SpeciesId(1)).unwrap(), 9).unwrap();
+        let gr = GrowthRate::Fast;
+
+        let needed_exp =
+            gr.exp_for_level(Level::new(15).unwrap()) - gr.exp_for_level(Level::new(9).unwrap());
+
+        // Give enough EXP to jump to level 15
+        let events = creature.gain_exp(needed_exp, &species_registry);
+        // assuming gain_exp now returns the combined events from all level-ups
+
+        // We expect two learn-move events: for lvl 10 and lvl 15
+        let learn_move_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, LevelUpEvent::CanLearnMove { .. }))
+            .collect();
+
+        assert_eq!(learn_move_events.len(), 2);
+
+        // Assert the move IDs directly using pattern matching
+        match learn_move_events[0] {
+            LevelUpEvent::CanLearnMove { move_id } => assert_eq!(*move_id, MoveId(2)), // level 10
+            _ => panic!("Expected CanLearnMove event at level 10"),
+        }
+
+        match learn_move_events[1] {
+            LevelUpEvent::CanLearnMove { move_id } => assert_eq!(*move_id, MoveId(3)), // level 15
+            _ => panic!("Expected CanLearnMove event at level 15"),
+        }
     }
 }
