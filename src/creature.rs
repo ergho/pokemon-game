@@ -2,7 +2,7 @@ use crate::experience::Level;
 use crate::moves::MoveId;
 use crate::species::{Species, SpeciesId};
 use crate::species_registry::SpeciesRegistry;
-use crate::stats::{BaseStats, IndividualStats};
+use crate::stats::{IndividualStats, Stat};
 use uuid::Uuid;
 
 /// Globally unique identifier for each persistent creature
@@ -48,20 +48,23 @@ impl Creature {
         let species_id = species.id;
         let name = species.name.clone().to_string();
         let individual_stats = IndividualStats::from_base(&species.base_stats);
-        let current_hp = individual_stats.max_hp.get();
         let level = Level::new(starting_level)?;
         let experience = species.growth_rate.exp_for_level(level);
 
-        Some(Self {
+        let mut creature = Self {
             id,
             species_id,
             name,
             level,
             experience,
             individual_stats,
-            current_hp,
+            current_hp: 0,
             moves: [None, None, None, None],
-        })
+        };
+
+        creature.calculate_stats(species);
+        creature.current_hp = creature.individual_stats.max_hp.get();
+        Some(creature)
     }
 
     pub fn name(&self) -> String {
@@ -123,7 +126,7 @@ impl Creature {
             None => panic!(),
         };
 
-        //self.recalculate_stats(level, species.base_stats);
+        self.calculate_stats(species);
 
         for m in species.learnset.iter().filter(|m| m.level == level) {
             events.push(LevelUpEvent::CanLearnMove {
@@ -138,9 +141,23 @@ impl Creature {
         events
     }
 
-    //fn recalculate_stats(&mut self, base_stats: BaseStats) {
+    fn calculate_stats(&mut self, species: &Species) {
+        let stats = &species.base_stats;
+        self.individual_stats.max_hp = Self::calculate_hp(stats.max_hp, self.level);
+        self.individual_stats.attack = Self::calculate_stat(stats.attack, self.level);
+        self.individual_stats.defense = Self::calculate_stat(stats.defense, self.level);
+        self.individual_stats.speed = Self::calculate_stat(stats.speed, self.level);
+    }
 
-    //}
+    fn calculate_hp(hp: Stat, level: Level) -> Stat {
+        let hp = (2 * hp.get() * level.get() as u16) / 100 + level.get() as u16 + 10;
+        Stat::new(hp).expect("HP within bounds")
+    }
+
+    fn calculate_stat(stat: Stat, level: Level) -> Stat {
+        let stat = (2 * stat.get() * level.get() as u16) / 100 + 5;
+        Stat::new(stat).expect("Stat within bounds")
+    }
 
     pub fn try_learn_move(&mut self, move_id: MoveId, max_pp: u8) -> LearnMoveResult {
         if self
@@ -261,10 +278,10 @@ mod tests {
         let registry = MockRegistry::new();
         let c = test_creature(5, &registry);
 
-        assert_eq!(c.current_hp, 50);
+        assert_eq!(c.current_hp, 20);
         assert_eq!(c.level.get(), 5);
         assert!(c.name().contains("Bulby"));
-        assert_eq!(c.individual_stats.attack.get(), 50);
+        assert_eq!(c.individual_stats.attack.get(), 10);
     }
 
     #[test]
@@ -273,13 +290,13 @@ mod tests {
         let mut c = test_creature(5, &registry);
 
         c.modify_hp(-10);
-        assert_eq!(c.current_hp, 40);
+        assert_eq!(c.current_hp, 10);
 
         c.modify_hp(5);
-        assert_eq!(c.current_hp, 45);
+        assert_eq!(c.current_hp, 15);
 
         c.modify_hp(100);
-        assert_eq!(c.current_hp, 50);
+        assert_eq!(c.current_hp, 20);
 
         c.modify_hp(-100);
         assert_eq!(c.current_hp, 0);
